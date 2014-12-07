@@ -13,6 +13,50 @@ logger.addHandler(ch)
 class PGenParsingException(Exception):
 	pass
 
+class TreeNode:
+	"""AST for patterns"""
+
+	Pattern		  = 0
+	PatternList	  = 1
+	PatternID	  = 2
+	Repeat		  = 3
+	StringLiteral = 4
+
+	def __init__(self, typeid=None, value=None, children=None):
+		self.typeid = typeid
+		self.value = value
+		self.children = children
+		logger.info('Node {0} created; children: {1}'.format(self, children))
+
+	def __str__(self):
+		#return 'typeid: {0}; value: {1}; children: {2}'.format(self.typeid, self.value, self.children)
+		return '<typeid: {0}; value: {1}>'.format(self.typeid, self.value)
+	
+	def addChild(self, child):
+		logger.info('Adding child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
+		if self.children is None:
+			self.children = []
+		self.children.append(child)
+		logger.info('Added child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
+
+def printAST(astNode, indent=0):
+	if indent == 0:
+		logger.info(str(astNode))
+	else:
+		logger.info(' ' * (indent) + '+--' + str(astNode))
+
+	if not astNode.children:
+		return
+
+	for child in astNode.children:
+		printAST(child, indent + 4)
+	
+########################################################################
+# List of pattern ASTs
+########################################################################
+ast = []
+
+
 class PatternLookupTable:
 	"""
 	The only purpose of this class is to answer the question:
@@ -31,6 +75,12 @@ class PatternLookupTable:
 
 
 class Pattern:
+	"""
+	Grammar:
+		P -> { L }
+		L -> PL
+			 id
+	"""
 
 	_plt = PatternLookupTable()
 
@@ -38,27 +88,79 @@ class Pattern:
 		self._list = []
 		self._string = string + '\x00'
 		self._pos = 0
+		self._braceCount = 0
 		self._curChar = self._string[self._pos]
+		self._root = TreeNode(typeid=TreeNode.Pattern)
 		logger.info('Parsing pattern "{0}"'.format(self._string))
 		self._parseString()
 		logger.info(self._list)
+		logger.info('Brace count: {0}'.format(self._braceCount))
 
 	def _parseString(self):
-		
-		if self._curChar == '\x00':
-			logger.info('Saw NULL character. Parsing is done!')
-			return
+		while self._curChar != '\x00':
+			if self._curChar == '{':
+				root = self._parsePattern()
+				ast.append(root)
+			elif self._curChar == '\\':
+				self._parseEscapedChar()
+			else:
+				self._consumeChar()
 
-		if self._curChar == '\\':
-			self._parseEscapedChar()
+		logger.info('Saw NULL character. Parsing is done!')
+		if self._braceCount < 0:
+			raise PGenParsingException('Unbalanced braces in the pattern')
+
+
+	def _parsePattern(self):
+		"""P production rule"""
+		self._consumeChar(keep=False)
+		astNode = TreeNode(typeid=TreeNode.Pattern)
+		self._parsePatternList(parent=astNode)
+		self._consumeChar(expect='}', keep=False)
+		return astNode
+
+	def _parsePatternList(self, parent):
+		"""L production rule"""
+		if str.isalpha(self._curChar):
+			parent.addChild(self._parsePatternId())
+		elif str.isdigit(self._curChar):
+			parent.addChild(self._parseRepeat(isdigit=True))
+		elif self._curChar in ['+','?','*']:
+			parent.addChild(self._parseRepeat(isdigit=False))
 		elif self._curChar == '{':
-			self._parsePattern()
+			astNodeRoot = self._parsePattern()
+			self._parsePatternList(astNodeRoot)
+			parent.addChild(astNodeRoot)
+			
+	def _parseRepeat(self, isdigit=True):
+		repeat = ''
+		if isdigit:
+			while str.isdigit(self._curChar):
+				repeat += self._curChar 
+				self._consumeChar(keep=False)
 		else:
-			self._consumeChar()
+			repeat = self._curChar
+			self._consumeChar(keep=False)
 
-		self._parseString()
+		logger.info('Repeat: "{0}"'.format(repeat))
+		return TreeNode(typeid=TreeNode.Repeat, value=repeat) 
 
-	def _consumeChar(self, join=False, keep=True):
+	def _parseStringLiteral(self):
+		"""Not implemented yet"""
+		pass
+
+	def _parsePatternId(self):
+		logger.info('Parsing pattern id')
+		patternId = ''
+		while str.isalpha(self._curChar):
+			patternId += self._curChar
+			self._consumeChar(keep=False)
+
+		logger.info('Pattern ID: "{0}"'.format(patternId))
+		Pattern._plt.add(patternId)
+		return TreeNode(typeid=TreeNode.PatternID, value=patternId)
+
+	def _consumeChar(self, expect=None, join=False, keep=True):
 		"""
 		If join is True, then consume the current character and the following one,
 		and join them together (e.g., the character sequence '\\', 'n'
@@ -66,8 +168,18 @@ class Pattern:
 		If keep is False, then consume the character but don't store it
 		"""
 
-		logger.info('Consuming character "{0}" (join={1}, keep={2}'.format(self._curChar, join, keep))
+		if self._curChar == '{':
+			self._braceCount += 1
+		elif self._curChar == '}':
+			self._braceCount -= 1
+			
+		logger.info('Consuming character "{0}" (expect={1}, join={2}, keep={3})'.format(self._curChar, expect, join, keep))
 
+		if expect:
+			# Assert that the current character is the one we're expecting
+			if self._curChar != expect:
+				raise PGenParsingException('Expected "{0}", but found "{1}" instead'.format(expect, self._curChar))
+				
 		if keep:
 			self._list.append(self._curChar)
 
@@ -91,39 +203,17 @@ class Pattern:
 		self._consumeChar(join=True)
 
 
-	def _parsePattern(self):
-		logger.info('parsing {} pattern')
-		self._consumeChar(keep=False) # Comsume '{'
-
-		if self._curChar == '{':
-			self._parsePattern()
-			return
-		elif self._curChar =='\'':
-			self._parseStringLiteral()
-		else:
-			self._parsePatternId()
-
-		if self._curChar != '}':
-			raise PGenParsingException('Expected a closing "}}", but found "{0}" instead'.format(self._curChar))
-
-		self._consumeChar(keep=False) # Consume '}'
-
-
-	def _parseStringLiteral(self):
-		pass
-
-	def _parsePatternId(self):
-		patternId = ''
-		while str.isalpha(self._curChar):
-			patternId += self._curChar
-			self._consumeChar(keep=False)
-
-		logger.info('Pattern ID: "{0}"'.format(patternId))
-		Pattern._plt.add(patternId)
-
 def main():
 	try:
-		p = Pattern('abc{{vowel}{cons}}')
+		#p = Pattern('{a}')
+		#p = Pattern('{{a}}')
+		#p = Pattern('{{{a}}}')
+		#p = Pattern('{{a}{b}}')
+		#p = Pattern('a{{cons}}b')
+		p = Pattern('{{{a}{b}}{{c}{d}{e}{{f}{g}}{h}}}{i}')
+		#p = Pattern('{{{a}{b}}{*}}')
+		for node in ast:
+			printAST(node)
 	except PGenParsingException as ex:
 		logging.error(ex)
 
