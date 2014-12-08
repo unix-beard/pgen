@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import random
 
 logger = logging.getLogger('pgen')
 logger.setLevel(logging.DEBUG)
@@ -39,11 +40,12 @@ class TreeNode:
 		self.children.append(child)
 		logger.info('Added child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
 
+
 def printAST(astNode, indent=0):
 	if indent == 0:
-		logger.info(str(astNode))
+		logger.info('`' + str(astNode))
 	else:
-		logger.info(' ' * (indent) + '+--' + str(astNode))
+		logger.info('|' + ' ' * indent + '`---' + str(astNode))
 
 	if not astNode.children:
 		return
@@ -90,7 +92,6 @@ class Pattern:
 		self._pos = 0
 		self._braceCount = 0
 		self._curChar = self._string[self._pos]
-		self._root = TreeNode(typeid=TreeNode.Pattern)
 		logger.info('Parsing pattern "{0}"'.format(self._string))
 		self._parseString()
 		logger.info(self._list)
@@ -101,6 +102,7 @@ class Pattern:
 			if self._curChar == '{':
 				root = self._parsePattern()
 				ast.append(root)
+				self._list.append(root)
 			elif self._curChar == '\\':
 				self._parseEscapedChar()
 			else:
@@ -202,6 +204,31 @@ class Pattern:
 
 		self._consumeChar(join=True)
 
+	def generate(self):
+		"""Traverse the list and AST and generate the string"""
+		s = ''
+		for elem in self._list:
+			s += self._generateFromAST(elem) if isinstance(elem, TreeNode) else elem
+		return s
+
+	def _generateFromAST(self, astNode):
+		s = self._walkAST(astNode, '')
+		return s
+
+	def _walkAST(self, astNode, input):
+		s = input 
+		if not astNode.children:
+			if astNode.value == 'vowel':
+				return random.choice(['e','y','u','i','o','a'])
+			elif astNode.value == 'cons':
+				return random.choice(['q','w','r','t','p','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'])
+			elif astNode.value == 'digit':
+				return str(random.choice(xrange(10)))
+
+		for child in astNode.children:
+			s += self._walkAST(child, input)
+		
+		return s
 
 def main():
 	try:
@@ -210,12 +237,19 @@ def main():
 		#p = Pattern('{{{a}}}')
 		#p = Pattern('{{a}{b}}')
 		#p = Pattern('a{{cons}}b')
-		p = Pattern('{{{a}{b}}{{c}{d}{e}{{f}{g}}{h}}}{i}')
-		#p = Pattern('{{{a}{b}}{*}}')
+		#p = Pattern('{{{a}{b}}{{c}{d}{e}{{f}{g}}{h}}}{i}')
+		#p = Pattern('0{{{vowel}{cons}}}1')
+		#p = Pattern('{{{{a}{+}}{*}}{?}}{1}')
+		#p = Pattern('{vowel}{cons}{digit}')
+		#p = Pattern('{cons}{vowel}{cons}{vowel}{cons}{vowel}{cons}')
+		p = Pattern('{cons}{vowel}{cons}{cons}{vowel}{cons}')
 		for node in ast:
 			printAST(node)
+
+		for i in xrange(10):
+			logger.info('Generated string: {0}'.format(p.generate()))
 	except PGenParsingException as ex:
-		logging.error(ex)
+		logger.error(ex)
 
 
 if __name__ == '__main__':
