@@ -2,6 +2,7 @@
 
 import logging
 import random
+import time
 
 logger = logging.getLogger('pgen')
 logger.setLevel(logging.DEBUG)
@@ -23,15 +24,17 @@ class TreeNode:
 	Repeat		  = 3
 	StringLiteral = 4
 
-	def __init__(self, typeid=None, value=None, children=None):
+	def __init__(self, typeid=None, value=None, children=None, boundTo=None):
 		self.typeid = typeid
 		self.value = value
 		self.children = children
+		# If the node's typeid id `Repeat`,
+		# then it shoulb be bound to some AST
+		self.boundTo = boundTo
 		logger.info('Node {0} created; children: {1}'.format(self, children))
 
 	def __str__(self):
-		#return 'typeid: {0}; value: {1}; children: {2}'.format(self.typeid, self.value, self.children)
-		return '<typeid: {0}; value: {1}>'.format(self.typeid, self.value)
+		return '<typeid: {0}; value: {1}; bound to: {2}; id: {3}>'.format(self.typeid, self.value, self.boundTo, hex(id(self)))
 	
 	def addChild(self, child):
 		logger.info('Adding child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
@@ -92,6 +95,7 @@ class Pattern:
 		self._pos = 0
 		self._braceCount = 0
 		self._curChar = self._string[self._pos]
+		self._prevASTNode = None
 		logger.info('Parsing pattern "{0}"'.format(self._string))
 		self._parseString()
 		logger.info(self._list)
@@ -118,6 +122,7 @@ class Pattern:
 		self._consumeChar(keep=False)
 		astNode = TreeNode(typeid=TreeNode.Pattern)
 		self._parsePatternList(parent=astNode)
+		self._prevASTNode = astNode
 		self._consumeChar(expect='}', keep=False)
 		return astNode
 
@@ -144,8 +149,9 @@ class Pattern:
 			repeat = self._curChar
 			self._consumeChar(keep=False)
 
-		logger.info('Repeat: "{0}"'.format(repeat))
-		return TreeNode(typeid=TreeNode.Repeat, value=repeat) 
+		logger.info('Repeat: "{0}"; bound to pattern: {1}'.format(repeat, self._prevASTNode))
+		printAST(self._prevASTNode)
+		return TreeNode(typeid=TreeNode.Repeat, value=repeat, boundTo=self._prevASTNode) 
 
 	def _parseStringLiteral(self):
 		"""Not implemented yet"""
@@ -206,16 +212,17 @@ class Pattern:
 
 	def generate(self):
 		"""Traverse the list and AST and generate the string"""
-		s = ''
-		for elem in self._list:
-			s += self._generateFromAST(elem) if isinstance(elem, TreeNode) else elem
-		return s
+		while True:
+			s = ''
+			for elem in self._list:
+				s += self._generateFromAST(elem) if isinstance(elem, TreeNode) else elem
+			yield s
 
 	def _generateFromAST(self, astNode):
 		s = self._walkAST(astNode, '')
 		return s
 
-	def _walkAST(self, astNode, input):
+	def _walkAST(self, astNode, input, repeat=None):
 		s = input 
 		if not astNode.children:
 			if astNode.value == 'vowel':
@@ -224,9 +231,16 @@ class Pattern:
 				return random.choice(['q','w','r','t','p','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'])
 			elif astNode.value == 'digit':
 				return str(random.choice(xrange(10)))
+			elif astNode.typeid == TreeNode.Repeat:
+				if repeat is None and (int(astNode.value) - 1) > 0:
+					s += self._walkAST(astNode.boundTo, input, int(astNode.value) - 1)
+				elif repeat > 1:
+					s += self._walkAST(astNode.boundTo, input, repeat - 1)
 
+				return s
+					
 		for child in astNode.children:
-			s += self._walkAST(child, input)
+			s += self._walkAST(child, input, repeat)
 		
 		return s
 
@@ -241,13 +255,18 @@ def main():
 		#p = Pattern('0{{{vowel}{cons}}}1')
 		#p = Pattern('{{{{a}{+}}{*}}{?}}{1}')
 		#p = Pattern('{vowel}{cons}{digit}')
+		#p = Pattern('{cons}{vowel}{cons}{vowel}{cons}')
 		#p = Pattern('{cons}{vowel}{cons}{vowel}{cons}{vowel}{cons}')
-		p = Pattern('{cons}{vowel}{cons}{cons}{vowel}{cons}')
+		#p = Pattern('{cons}{vowel}{cons}{cons}{vowel}{cons}')
+		#p = Pattern('{{{{digit}{digit}}{1}{vowel}{1}}{2}}{3}')
+		#p = Pattern('{{digit}{1}{digit}{2}}{3}')
+		p = Pattern('{{vowel}{3}{cons}{2}}')
 		for node in ast:
 			printAST(node)
 
-		for i in xrange(10):
-			logger.info('Generated string: {0}'.format(p.generate()))
+		for i in xrange(1):
+			logger.info('Generated string: {0}'.format(p.generate().next()))
+			#time.sleep(5)
 	except PGenParsingException as ex:
 		logger.error(ex)
 
