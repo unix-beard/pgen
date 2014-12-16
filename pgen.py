@@ -4,51 +4,54 @@ import logging
 import random
 import time
 
+###########################################################
 logger = logging.getLogger('pgen')
 logger.setLevel(logging.DEBUG)
+#logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(funcName)s: %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+###########################################################
+
 
 class PGenParsingException(Exception):
 	pass
 
-class TreeNode:
+class AstNode:
 	"""AST for patterns"""
 
 	Pattern		  = 0
 	PatternList	  = 1
 	PatternID	  = 2
-	Repeat		  = 3
-	StringLiteral = 4
+	Char		  = 3
+	Quantifier	  = 4
+	StringLiteral = 5
 
-	def __init__(self, typeid=None, value=None, children=None, boundTo=None):
+	def __init__(self, typeid=None, value=None, children=None):
 		self.typeid = typeid
 		self.value = value
 		self.children = children
-		# If the node's typeid id `Repeat`,
-		# then it shoulb be bound to some AST
-		self.boundTo = boundTo
-		logger.info('Node {0} created; children: {1}'.format(self, children))
+		# If the node's typeid id is `Quantifier`,
+		# then it should be bound to some pattern (AST)
+		self.quantifier = None
+		logger.debug('Node {0} created; children: {1}'.format(self, children))
 
 	def __str__(self):
-		return '<typeid: {0}; value: {1}; bound to: {2}; id: {3}>'.format(self.typeid, self.value, self.boundTo, hex(id(self)))
+		return '<typeid: {0}; value: {1}; quantifier: {2}; id: {3}>'.format(self.typeid, self.value, self.quantifier, hex(id(self)))
 	
 	def addChild(self, child):
-		logger.info('Adding child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
 		if self.children is None:
 			self.children = []
 		self.children.append(child)
-		logger.info('Added child [{0}] with children {1} to parent [{2}]'.format(child, child.children, self))
 
 
 def printAST(astNode, indent=0):
 	if indent == 0:
 		logger.info('`' + str(astNode))
 	else:
-		logger.info('|' + ' ' * indent + '`---' + str(astNode))
+		logger.info(' ' * indent + '`---' + str(astNode))
 
 	if not astNode.children:
 		return
@@ -56,11 +59,6 @@ def printAST(astNode, indent=0):
 	for child in astNode.children:
 		printAST(child, indent + 4)
 	
-########################################################################
-# List of pattern ASTs
-########################################################################
-ast = []
-
 
 class PatternLookupTable:
 	"""
@@ -75,113 +73,131 @@ class PatternLookupTable:
 		return True if patternId in self._set else False
 
 	def add(self, patternId):
-		logger.info('Added pattern ID "{0}" to PLT'.format(patternId))
+		logger.debug('Added pattern ID "{0}" to PLT'.format(patternId))
 		self._set.add(patternId)
 
 
 class Pattern:
 	"""
 	Grammar:
-		P -> { L }
-		L -> PL
-			 id
+		Expr -> Term Expr
+		Term -> `{` Expr `}` | `{` [id | quantifier] `}`
+
+		quantifier -> digit+ | `+` | `?` | `*`
+		char -> any valid unicode char
+		digit -> [0-9]
+		id -> [a-zA-Z]+
 	"""
 
 	_plt = PatternLookupTable()
 
 	def __init__(self, string):
-		self._list = []
-		self._string = string + '\x00'
+		self._root = AstNode(typeid=AstNode.Pattern)
+		self._nodeStack = []
+		self._string = string + '\x00' * 3
 		self._pos = 0
-		self._braceCount = 0
 		self._curChar = self._string[self._pos]
-		self._prevASTNode = None
-		logger.info('Parsing pattern "{0}"'.format(self._string))
+		logger.info('Parsing pattern "{0}"\n{1}'.format(self._string, '#' * 80))
 		self._parseString()
-		logger.info(self._list)
-		logger.info('Brace count: {0}'.format(self._braceCount))
+		printAST(self._root)
+
+		# Should be empty by now!
+		assert(self._nodeStack == [])
+		logger.debug(self._nodeStack)
 
 	def _parseString(self):
+		"""This method corresponds to the P production rule"""
 		while self._curChar != '\x00':
+			node = AstNode()
 			if self._curChar == '{':
-				root = self._parsePattern()
-				ast.append(root)
-				self._list.append(root)
+				node.typeid = AstNode.Pattern
+				self._parsePatternExpr(node)
 			elif self._curChar == '\\':
-				self._parseEscapedChar()
+				node.typeid = astnode.char
+				self._parseEscapedChar(node)
+			elif str.isalnum(self._curChar):
+				node.typeid = AstNode.Char
+				self._consumeChar(astNode=node)
+			elif self._curChar not in ['{', '}']:
+				node.typeid = AstNode.Char
+				self._consumeChar(astNode=node)
 			else:
-				self._consumeChar()
+				raise PGenParsingException('Unexpected character "{0}"'.format(self._curChar))
 
-		logger.info('Saw NULL character. Parsing is done!')
-		if self._braceCount < 0:
-			raise PGenParsingException('Unbalanced braces in the pattern')
-
-
-	def _parsePattern(self):
-		"""P production rule"""
-		self._consumeChar(keep=False)
-		astNode = TreeNode(typeid=TreeNode.Pattern)
-		self._parsePatternList(parent=astNode)
-		self._prevASTNode = astNode
-		self._consumeChar(expect='}', keep=False)
-		return astNode
-
-	def _parsePatternList(self, parent):
-		"""L production rule"""
-		if str.isalpha(self._curChar):
-			parent.addChild(self._parsePatternId())
-		elif str.isdigit(self._curChar):
-			parent.addChild(self._parseRepeat(isdigit=True))
-		elif self._curChar in ['+','?','*']:
-			parent.addChild(self._parseRepeat(isdigit=False))
-		elif self._curChar == '{':
-			astNodeRoot = self._parsePattern()
-			self._parsePatternList(astNodeRoot)
-			parent.addChild(astNodeRoot)
+			self._root.addChild(node)
 			
-	def _parseRepeat(self, isdigit=True):
-		repeat = ''
-		if isdigit:
+		logger.debug('Saw NULL character. Parsing is done!')
+
+	def _parsePatternExpr(self, astNode):
+		# Consume pattern's open curly brace
+		self._consumeChar(keep=False)
+
+		self._parsePatternTerm(astNode)
+
+		if self._curChar == '{':
+			self._parsePatternExpr(astNode)
+
+		# Pop the current node
+		self._nodeStack.pop()
+
+	def _parsePatternTerm(self, astNode=None):
+		node = AstNode()
+
+		# Push the current node on the stack
+		self._nodeStack.append(node)
+
+		if str.isalpha(self._curChar):
+			self._parsePatternId(node)
+		elif str.isdigit(self._curChar) or self._curChar in ['?', '+', '*']:
+			self._parseQuantifier(node)
+			self._nodeStack[-2].quantifier = node
+			logger.debug('Last node on the stack: {0}'.format(self._nodeStack[-2]))
+		elif self._curChar == '{':
+			self._parsePatternExpr(node)
+		else:
+			raise PGenParsingException('Unexpected character "{0}"'.format(self._curChar))	
+
+		# Don't add quantifiers
+		if node.typeid != AstNode.Quantifier:
+			astNode.addChild(node)
+
+		# Consume pattern's close curly brace
+		self._consumeChar(expect='}', keep=False)
+
+
+	def _parseQuantifier(self, astNode):
+		quantifier = ''
+		if str.isdigit(self._curChar):
 			while str.isdigit(self._curChar):
-				repeat += self._curChar 
+				quantifier += self._curChar 
 				self._consumeChar(keep=False)
 		else:
-			repeat = self._curChar
+			quantifier = self._curChar
 			self._consumeChar(keep=False)
 
-		logger.info('Repeat: "{0}"; bound to pattern: {1}'.format(repeat, self._prevASTNode))
-		printAST(self._prevASTNode)
-		return TreeNode(typeid=TreeNode.Repeat, value=repeat, boundTo=self._prevASTNode) 
+		astNode.typeid = AstNode.Quantifier
+		astNode.value=quantifier
 
 	def _parseStringLiteral(self):
 		"""Not implemented yet"""
 		pass
 
-	def _parsePatternId(self):
-		logger.info('Parsing pattern id')
+	def _parsePatternId(self, astNode=None):
+		logger.debug('Parsing pattern id')
 		patternId = ''
 		while str.isalpha(self._curChar):
 			patternId += self._curChar
 			self._consumeChar(keep=False)
 
-		logger.info('Pattern ID: "{0}"'.format(patternId))
+		logger.debug('Pattern ID: "{0}"'.format(patternId))
 		Pattern._plt.add(patternId)
-		return TreeNode(typeid=TreeNode.PatternID, value=patternId)
+		astNode.typeid = AstNode.PatternID
+		astNode.value = patternId
 
-	def _consumeChar(self, expect=None, join=False, keep=True):
-		"""
-		If join is True, then consume the current character and the following one,
-		and join them together (e.g., the character sequence '\\', 'n'
-		becomes '\\n' in the list).
-		If keep is False, then consume the character but don't store it
-		"""
+	def _consumeChar(self, expect=None, keep=True, astNode=None):
+		"""If keep is False, then consume the character but don't store it"""
 
-		if self._curChar == '{':
-			self._braceCount += 1
-		elif self._curChar == '}':
-			self._braceCount -= 1
-			
-		logger.info('Consuming character "{0}" (expect={1}, join={2}, keep={3})'.format(self._curChar, expect, join, keep))
+		logger.debug('Consuming character "{0}" (expect={1}, keep={2})'.format(self._curChar, expect, keep))
 
 		if expect:
 			# Assert that the current character is the one we're expecting
@@ -189,82 +205,112 @@ class Pattern:
 				raise PGenParsingException('Expected "{0}", but found "{1}" instead'.format(expect, self._curChar))
 				
 		if keep:
-			self._list.append(self._curChar)
+			astNode.value = self._curChar
 
 		self._pos += 1
 		self._curChar = self._string[self._pos]
 
-		if join:
-			logger.info('Consuming character "{0}" and joining it with "{1}"'.format(self._curChar, self._string[self._pos - 1]))
-			if keep:
-				self._list[-1] += self._curChar
-			self._pos += 1
-			self._curChar = self._string[self._pos]
+		logger.debug('Current character is "{0}"'.format(self._curChar))
 
-		logger.info('Current character is "{0}"'.format(self._curChar))
-
-	def _parseEscapedChar(self):
-		nextChar = self._string[self._pos + 1]
+	def _parseEscapedChar(self, astNode=None):
+		nextChar = self._peek()
 		if nextChar not in ['n', 't', '\\']:
 			raise PGenParsingException('Unknown escape character "{0}{1}"'.format(self._curChar, nextChar))
 
-		self._consumeChar(join=True)
+		astNode.value = self._curChar + nextChar
+		self._consumeChar(keep=False)
+		self._consumeChar(keep=False)
+
+	def _peek(self, lookahead=1):
+		return self._string[self._pos + lookahead]
 
 	def generate(self):
 		"""Traverse the list and AST and generate the string"""
 		while True:
-			s = ''
-			for elem in self._list:
-				s += self._generateFromAST(elem) if isinstance(elem, TreeNode) else elem
-			yield s
+			yield self._generateFromAST(self._root)
 
 	def _generateFromAST(self, astNode):
-		s = self._walkAST(astNode, '')
-		return s
+		return self._walkAST(astNode, '')
 
-	def _walkAST(self, astNode, input, repeat=None):
+	def _walkAST(self, astNode, input):
 		s = input 
 		if not astNode.children:
 			if astNode.value == 'vowel':
-				return random.choice(['e','y','u','i','o','a'])
+				s = self._applyQuantifier(astNode, random.choice, ['e','y','u','i','o','a'])
 			elif astNode.value == 'cons':
-				return random.choice(['q','w','r','t','p','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'])
+				s = self._applyQuantifier(astNode, random.choice, ['q','w','r','t','p','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m'])
 			elif astNode.value == 'digit':
-				return str(random.choice(xrange(10)))
-			elif astNode.typeid == TreeNode.Repeat:
-				if repeat is None and (int(astNode.value) - 1) > 0:
-					s += self._walkAST(astNode.boundTo, input, int(astNode.value) - 1)
-				elif repeat > 1:
-					s += self._walkAST(astNode.boundTo, input, repeat - 1)
-
-				return s
+				s = self._applyQuantifier(astNode, random.choice, xrange(10))
+			else:
+				s = astNode.value
 					
+			return s
+
 		for child in astNode.children:
-			s += self._walkAST(child, input, repeat)
+			s += self._walkAST(child, input)
 		
 		return s
 
+	def _applyQuantifier(self, astNode, func, *args):
+		##############################################
+		# TODO: Handle +,?,* quantifiers as well
+		##############################################
+
+		if astNode.quantifier is None:
+			return func(*args)
+
+		s = ''
+		for i in xrange(int(astNode.quantifier.value)):
+			s += str(func(*args))
+		return s
+		
+		
 def main():
 	try:
 		#p = Pattern('{a}')
 		#p = Pattern('{{a}}')
 		#p = Pattern('{{{a}}}')
+		#p = Pattern('{a}{b}')
 		#p = Pattern('{{a}{b}}')
-		#p = Pattern('a{{cons}}b')
+		#p = Pattern('{{a}{b}{c}}')
+		#p = Pattern('{{a}{b}}{{c}{d}}')
+		#p = Pattern('{{a}{b}}{{c}{d}}{e}')
+		#p = Pattern('{{{a}{b}}{{c}{d}}}{e}')
+		#p = Pattern('a{cons}b')
+		#p = Pattern('ab{cons}{vowel}')
+		#p = Pattern('ab{{cons}{vowel}}')
+		#p = Pattern('ab{{{cons}{vowel}}{cons}}')
 		#p = Pattern('{{{a}{b}}{{c}{d}{e}{{f}{g}}{h}}}{i}')
 		#p = Pattern('0{{{vowel}{cons}}}1')
 		#p = Pattern('{{{{a}{+}}{*}}{?}}{1}')
 		#p = Pattern('{vowel}{cons}{digit}')
-		#p = Pattern('{cons}{vowel}{cons}{vowel}{cons}')
+		#p = Pattern('{}')
+		#p = Pattern('{}{}')
+		#p = Pattern('{{}{}}{}{}{}{{}{}{}{{}{}{{}}}}')
+
+		# Unbalanced
+		#p = Pattern('{')
+		#p = Pattern('{{}')
+		#p = Pattern('{{}}{')
+		#p = Pattern('{{{')
+		#p = Pattern('{{}{}}{}{}{{{}}')
+
+		# Quantifiers
+		#p = Pattern('{{a}{1}{b}{2}}{3}{c}{4}')
 		#p = Pattern('{cons}{vowel}{cons}{vowel}{cons}{vowel}{cons}')
 		#p = Pattern('{cons}{vowel}{cons}{cons}{vowel}{cons}')
 		#p = Pattern('{{{{digit}{digit}}{1}{vowel}{1}}{2}}{3}')
 		#p = Pattern('{{digit}{1}{digit}{2}}{3}')
-		p = Pattern('{{vowel}{3}{cons}{2}}')
-		for node in ast:
-			printAST(node)
+		#p = Pattern('{{vowel}{3}{cons}{2}}')
+		#p = Pattern('{{a}{1}{b}{+}{c}{*}}{?}}')
+		
+		# Unbound quantifiers 
+		#p = Pattern('{?}{a}')
+		#p = Pattern('{a}{*}{{{b}{+}}{*}}{?}')
+		#p = Pattern('a{cons}_{digit}{2}')
+		p = Pattern('a{cons}_{vowel}{const}-{digit}{2}')
 
-		for i in xrange(1):
+		for i in xrange(2):
 			logger.info('Generated string: {0}'.format(p.generate().next()))
 			#time.sleep(5)
 	except PGenParsingException as ex:
