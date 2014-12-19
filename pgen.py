@@ -24,7 +24,7 @@ class PGenParsingException(Exception):
 class AstNode:
     """AST for patterns"""
 
-    Pattern, PatternList, PatternID, Char, Quantifier, StringLiteral = range(6)
+    Pattern, PatternID, Char, Quantifier, StringLiteral = range(5)
 
     def __init__(self, typeid=None, value=None, children=None):
         self.typeid = typeid
@@ -42,6 +42,12 @@ class AstNode:
         if self.children is None:
             self.children = []
         self.children.append(child)
+
+    def getValue(self):
+        if type(self.value) is tuple:
+            return random.choice(xrange(int(self.value[0]), int(self.value[-1]) + 1))
+        else:
+            return self.value
 
 
 def printAST(astNode, indent=0):
@@ -164,18 +170,43 @@ class Pattern:
         # Consume pattern's close curly brace
         self._consumeChar(expect='}', keep=False)
 
+
     def _parseQuantifier(self, astNode):
-        quantifier = ''
-        if str.isdigit(self._curChar):
+
+        def _parseRangeQuantifier():
+            '''Parse {number:number} quantifier'''
+            
+            ######################################
+            # TODO: Improve range parsing
+            ######################################
+
+            rangeQuantifier = ''
             while str.isdigit(self._curChar):
-                quantifier += self._curChar
+                rangeQuantifier += self._curChar
                 self._consumeChar(keep=False)
-        else:
-            quantifier = self._curChar
+
+            if self._curChar == ':':
+                self._consumeChar(keep=False)
+                rangeQuantifier += ':'
+                rangeQuantifier += _parseRangeQuantifier()
+                
+            return rangeQuantifier
+        
+        def _parseGeneralQuantifier():
+            '''Parse ?, +, * quantifiers'''
+            q = self._curChar
             self._consumeChar(keep=False)
+            return q
+            
+
+        def _filterRange(rangeStr):
+            li = [elem for elem in rangeStr.split(':') if elem != '']
+            # Return the first and the last elements of the range
+            return (li[0], li[-1])
 
         astNode.typeid = AstNode.Quantifier
-        astNode.value = quantifier
+        astNode.value = _filterRange(_parseRangeQuantifier()) if str.isdigit(self._curChar) else _parseGeneralQuantifier()
+        logger.debug('parsed quantifier: {0}'.format(astNode.value))
 
     def _parseStringLiteral(self):
         """Not implemented yet"""
@@ -252,7 +283,7 @@ class Pattern:
 
             return s
 
-        for i in xrange(int(astNode.quantifier.value) if astNode.quantifier is not None else 1):
+        for i in xrange(int(astNode.quantifier.getValue()) if astNode.quantifier is not None else 1):
             for child in astNode.children:
                 s += self._walkAST(child, input)
 
@@ -267,7 +298,7 @@ class Pattern:
             return func(*args)
 
         s = ''
-        for i in xrange(int(astNode.quantifier.value)):
+        for i in xrange(int(astNode.quantifier.getValue())):
             s += str(func(*args))
         return s
 
@@ -312,6 +343,13 @@ def main():
         #p = Pattern('{{a}{1}{b}{+}{c}{*}}{?}}')
         #p = Pattern('{a}{*}{{{b}{+}}{*}}{?}')
 
+        # Range quantifiers
+        #p = Pattern('{digit}{1:}')
+        #p = Pattern('{digit}{1:2}')
+        #p = Pattern('{digit}{1:2:}')
+        #p = Pattern('{digit}{1:2:3}')
+        #p = Pattern('{{vowel}{cons}}{2:3}')
+        
         # Unbound quantifiers
         #p = Pattern('{2}{a}')
         #p = Pattern('{?}{a}')
@@ -319,18 +357,22 @@ def main():
         # Misc 
 
         #p = Pattern('a{cons}_{digit}{2}')
+        #p = Pattern('a{cons}_{digit}{2:4}')
         #p = Pattern('a{cons}_{vowel}{cons}-{digit}{2}')
+        #p = Pattern('a{cons}_{vowel}{cons}-{digit}{1:3}')
         #p = Pattern('{{{vowel}{2}{cons}{2}}{2}}{2}')
         #p = Pattern('{{vowel}{2}{cons}{2}}{2}')
         #p = Pattern('{{vowel}{digit}{2}}{2}')
-        p = Pattern('az{alpha}{3}{vowel}++')
+        #p = Pattern('az{alpha}{1:3}{vowel}++')
+
+        # Meta pattern
+        p = Pattern('\{vowel\}\{cons\}')
 
         # Escaped characters
         #p = Pattern('\{\{\t\}\}\\\\-\n')
 
         for i in xrange(20):
             logger.info('Generated string: {0}'.format(p.generate().next()))
-            #time.sleep(5)
     except PGenParsingException as ex:
         logger.error(ex)
 
