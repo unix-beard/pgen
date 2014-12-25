@@ -7,8 +7,8 @@ import string
 
 ###########################################################
 logger = logging.getLogger('pgen')
-logger.setLevel(logging.DEBUG)
-#logger.setLevel(logging.INFO)
+#logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(funcName)s: %(message)s')
@@ -103,9 +103,9 @@ class Pattern:
         self._string = patternStr + '\x00' * 2
         self._pos = 0
         self._curChar = self._string[self._pos]
-        logger.info('Parsing pattern "{0}"\n{1}'.format(self._string, '#' * 80))
+        #logger.info('Parsing pattern "{0}"\n{1}'.format(self._string, '#' * 80))
         self._parseString()
-        printAST(self._root)
+        #printAST(self._root)
 
         # Should be empty by now!
         assert(self._nodeStack == [])
@@ -348,7 +348,12 @@ def main():
         #p = Pattern('{digit}{1:2}')
         #p = Pattern('{digit}{1:2:}')
         #p = Pattern('{digit}{1:2:3}')
-        #p = Pattern('{{vowel}{cons}}{2:3}')
+        p = Pattern('{{vowel}{cons}{{vowel}{cons}}{1:3}}{1:3}')
+        p1 = Pattern('{{cons}{vowel}{{cons}{vowel}}{1:3}}{1:3}')
+        p2 = Pattern('{vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
+	p3 = Pattern('{vowel}{cons} {cons}{vowel}{cons} {vowel}{cons} {vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
+	p4 = Pattern('{vowel}{cons}{vowel}')
+	p5 = Pattern('{cons}{vowel}{cons}')
         
         # Unbound quantifiers
         #p = Pattern('{2}{a}')
@@ -366,16 +371,25 @@ def main():
         #p = Pattern('az{alpha}{1:3}{vowel}++')
 
         # Meta pattern
-        p = Pattern('\{vowel\}\{cons\}')
+        #p = Pattern('\{vowel\}\{cons\}')
 
         # Escaped characters
         #p = Pattern('\{\{\t\}\}\\\\-\n')
 
-        for i in xrange(20):
-            logger.info('Generated string: {0}'.format(p.generate().next()))
+        for i in xrange(30000):
+            #logger.info('Generated string: {0}'.format(p.generate().next()))
+            print('{0}'.format(p.generate().next()))
+            print('{0}'.format(p1.generate().next()))
+            print('{0}'.format(p2.generate().next()))
+            print('{0}'.format(p3.generate().next()))
+            print('{0}'.format(p4.generate().next()))
+            print('{0}'.format(p5.generate().next()))
     except PGenParsingException as ex:
         logger.error(ex)
 
 
 if __name__ == '__main__':
     main()
+
+
+
