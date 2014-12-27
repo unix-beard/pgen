@@ -45,7 +45,7 @@ class AstNode:
 
     def getValue(self):
         if type(self.value) is tuple:
-            return random.choice(xrange(int(self.value[0]), int(self.value[-1]) + 1))
+            return random.choice(range(int(self.value[0]), int(self.value[-1]) + 1))
         else:
             return self.value
 
@@ -94,25 +94,34 @@ class Pattern:
 
     _plt = PatternLookupTable()
 
-    def __init__(self, patternStr):
-        self._vowels = ['e','y','u','i','o','a']
-        self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
+    def __init__(self, patternStr, patternId=''):
+        #self._vowels = ['e','y','u','i','o','a']
+        #self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
         
+        self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
+        self._cons = ['й','ц','к','н','г','ш','щ','з','х','ъ','ф','в','п','р','л','д','ж','ч','с','м','т','ь','б']
+
         self._root = AstNode(typeid=AstNode.Pattern)
         self._nodeStack = []
-        self._string = patternStr + '\x00' * 2
+        self.patternStr = patternStr
+        self.patternId = patternId 
         self._pos = 0
-        self._curChar = self._string[self._pos]
-        #logger.info('Parsing pattern "{0}"\n{1}'.format(self._string, '#' * 80))
-        self._parseString()
-        #printAST(self._root)
+        self._curChar = self.patternStr[self._pos]
 
-        # Should be empty by now!
-        assert(self._nodeStack == [])
-        logger.debug(self._nodeStack)
+    def __add__(self, other):
+        return Pattern(self.patternStr + other.patternStr)
+
+    def __iadd__(self, other):
+        self.patternStr += other.patternStr
+        return self
+
+    def _reset(self):
+        pass
 
     def _parseString(self):
-        """This method corresponds to the P production rule"""
+        """This method corresponds to the Expr production rule"""
+        self.patternStr += '\x00' * 2
+
         while self._curChar != '\x00':
             node = AstNode()
             if self._curChar == '{':
@@ -135,6 +144,8 @@ class Pattern:
         logger.debug('Saw NULL character. Parsing is done!')
 
     def _parsePatternExpr(self, astNode):
+        """This method corresponds to the Term production rule"""
+
         # Consume pattern's open curly brace
         self._consumeChar(keep=False)
 
@@ -238,7 +249,7 @@ class Pattern:
             astNode.value = self._curChar
 
         self._pos += 1
-        self._curChar = self._string[self._pos]
+        self._curChar = self.patternStr[self._pos]
 
         logger.debug('Current character is "{0}"'.format(self._curChar))
 
@@ -257,10 +268,18 @@ class Pattern:
         self._consumeChar(keep=False)
 
     def _peek(self, lookahead=1):
-        return self._string[self._pos + lookahead]
+        return self.patternStr[self._pos + lookahead]
 
     def generate(self):
         """Traverse AST and generate the string"""
+        #logger.info('Parsing pattern "{0}"\n{1}'.format(self.patternStr, '#' * 80))
+        self._parseString()
+        #printAST(self._root)
+
+        # Should be empty by now!
+        assert(self._nodeStack == [])
+        #logger.debug(self._nodeStack)
+
         while True:
             yield self._generateFromAST(self._root)
 
@@ -275,7 +294,7 @@ class Pattern:
             elif astNode.value == 'cons':
                 s = self._applyQuantifier(astNode, random.choice, self._cons)
             elif astNode.value == 'digit':
-                s = self._applyQuantifier(astNode, random.choice, xrange(10))
+                s = self._applyQuantifier(astNode, random.choice, range(10))
             elif astNode.value == 'alpha':
                 s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
             else:
@@ -283,7 +302,7 @@ class Pattern:
 
             return s
 
-        for i in xrange(int(astNode.quantifier.getValue()) if astNode.quantifier is not None else 1):
+        for i in range(int(astNode.quantifier.getValue()) if astNode.quantifier is not None else 1):
             for child in astNode.children:
                 s += self._walkAST(child, input)
 
@@ -295,10 +314,10 @@ class Pattern:
         ##############################################
 
         if astNode.quantifier is None:
-            return func(*args)
+            return str(func(*args))
 
         s = ''
-        for i in xrange(int(astNode.quantifier.getValue())):
+        for i in range(int(astNode.quantifier.getValue())):
             s += str(func(*args))
         return s
 
@@ -351,9 +370,11 @@ def main():
         p = Pattern('{{vowel}{cons}{{vowel}{cons}}{1:3}}{1:3}')
         p1 = Pattern('{{cons}{vowel}{{cons}{vowel}}{1:3}}{1:3}')
         p2 = Pattern('{vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
-	p3 = Pattern('{vowel}{cons} {cons}{vowel}{cons} {vowel}{cons} {vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
-	p4 = Pattern('{vowel}{cons}{vowel}')
-	p5 = Pattern('{cons}{vowel}{cons}')
+        p3 = Pattern('{vowel}{cons} {cons}{vowel}{cons} {vowel}{cons} {vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
+        p4 = Pattern('{vowel}{cons}{vowel}')
+        p5 = Pattern('{cons}{vowel}{cons}')
+        p6 = Pattern('{cons}{vowel}{2}')
+        p7 = Pattern('{vowel}{cons}{2}')
         
         # Unbound quantifiers
         #p = Pattern('{2}{a}')
@@ -376,14 +397,24 @@ def main():
         # Escaped characters
         #p = Pattern('\{\{\t\}\}\\\\-\n')
 
-        for i in xrange(30000):
+        d = Pattern('б')
+        pat = Pattern('{cons}')
+        pat += Pattern('{vowel}')
+        pat += Pattern('{digit} ')
+        pat += Pattern('{alpha}{1:3} ')
+        pat += d + Pattern('{vowel}') + d
+        
+        for i in range(20):
+            print(next(pat.generate()))
             #logger.info('Generated string: {0}'.format(p.generate().next()))
-            print('{0}'.format(p.generate().next()))
-            print('{0}'.format(p1.generate().next()))
-            print('{0}'.format(p2.generate().next()))
-            print('{0}'.format(p3.generate().next()))
-            print('{0}'.format(p4.generate().next()))
-            print('{0}'.format(p5.generate().next()))
+            #print('{0}'.format(next(p.generate())))
+            #print('{0}'.format(next(p1.generate())))
+            #print('{0}'.format(next(p2.generate())))
+            #print('{0}'.format(next(p3.generate())))
+            #print('{0}'.format(next(p4.generate())))
+            #print('{0}'.format(next(p5.generate())))
+            #print('{0}'.format(next(p6.generate())))
+            #print('{0}'.format(next(p7.generate())))
     except PGenParsingException as ex:
         logger.error(ex)
 
