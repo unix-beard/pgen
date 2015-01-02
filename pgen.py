@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import logging
 import random
@@ -63,23 +63,6 @@ def printAST(astNode, indent=0):
         printAST(child, indent + 4)
 
 
-class PatternLookupTable:
-    """
-    The only purpose of this class is to answer the question:
-    Was some pattern previously defined or not?
-    """
-
-    def __init__(self):
-        self._set = set()
-
-    def __contains__(self, patternId):
-        return True if patternId in self._set else False
-
-    def add(self, patternId):
-        logger.debug('Added pattern ID "{0}" to PLT'.format(patternId))
-        self._set.add(patternId)
-
-
 class Pattern:
     """
     Grammar:
@@ -92,14 +75,13 @@ class Pattern:
         id -> [a-zA-Z]+
     """
 
-    _plt = PatternLookupTable()
-
     def __init__(self, patternStr, patternId=''):
-        #self._vowels = ['e','y','u','i','o','a']
-        #self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
+        self._vowels = ['e','y','u','i','o','a']
+        self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
         
-        self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
-        self._cons = ['й','ц','к','н','г','ш','щ','з','х','ъ','ф','в','п','р','л','д','ж','ч','с','м','т','ь','б']
+        #self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
+        #self._cons = ['й','ц','к','н','г','ш','щ','з','х','ъ','ф','в','п','р','л','д','ж','ч','с','м','т','ь','б']
+        self._quant = ['?','+','*','@']
 
         self._root = AstNode(typeid=AstNode.Pattern)
         self._nodeStack = []
@@ -114,9 +96,6 @@ class Pattern:
     def __iadd__(self, other):
         self.patternStr += other.patternStr
         return self
-
-    def _reset(self):
-        pass
 
     def _parseString(self):
         """This method corresponds to the Expr production rule"""
@@ -165,7 +144,7 @@ class Pattern:
 
         if str.isalpha(self._curChar):
             self._parsePatternId(node)
-        elif str.isdigit(self._curChar) or self._curChar in ['?', '+', '*']:
+        elif str.isdigit(self._curChar) or self._curChar in self._quant:
             self._parseQuantifier(node)
             self._nodeStack[-2].quantifier = node
             logger.debug('Last node on the stack: {0}'.format(self._nodeStack[-2]))
@@ -185,7 +164,7 @@ class Pattern:
     def _parseQuantifier(self, astNode):
 
         def _parseRangeQuantifier():
-            '''Parse {number:number} quantifier'''
+            """Parse {number:number} quantifier"""
             
             ######################################
             # TODO: Improve range parsing
@@ -204,7 +183,7 @@ class Pattern:
             return rangeQuantifier
         
         def _parseGeneralQuantifier():
-            '''Parse ?, +, * quantifiers'''
+            """Parse ?, +, *, @ quantifiers"""
             q = self._curChar
             self._consumeChar(keep=False)
             return q
@@ -302,24 +281,33 @@ class Pattern:
 
             return s
 
+        if astNode.quantifier and astNode.quantifier.getValue() in self._quant:
+            return self._applyNonNumericQuantifier(astNode)
+
         for i in range(int(astNode.quantifier.getValue()) if astNode.quantifier is not None else 1):
             for child in astNode.children:
                 s += self._walkAST(child, input)
 
         return s
 
-    def _applyQuantifier(self, astNode, func, *args):
-        ##############################################
+    def _applyNonNumericQuantifier(self, astNode):
+        ################################################
         # TODO: Handle +,?,* quantifiers as well
-        ##############################################
+        # For now this method handles only '@' (any of)
+        ################################################
 
+        s = ''
+        return self._walkAST(random.choice(astNode.children), s)
+
+    def _applyQuantifier(self, astNode, func, *args):
         if astNode.quantifier is None:
             return str(func(*args))
 
         s = ''
-        for i in range(int(astNode.quantifier.getValue())):
-            s += str(func(*args))
-        return s
+        if astNode.quantifier.getValue() not in self._quant:
+            for i in range(int(astNode.quantifier.getValue())):
+                s += str(func(*args))
+            return s
 
 
 def main():
@@ -397,15 +385,18 @@ def main():
         # Escaped characters
         #p = Pattern('\{\{\t\}\}\\\\-\n')
 
-        d = Pattern('б')
-        pat = Pattern('{cons}')
-        pat += Pattern('{vowel}')
-        pat += Pattern('{digit} ')
-        pat += Pattern('{alpha}{1:3} ')
-        pat += d + Pattern('{vowel}') + d
+        #d = Pattern('б')
+        #pat = Pattern('{cons}')
+        #pat += Pattern('{vowel}')
+        #pat += Pattern('{digit} ')
+        #pat += Pattern('{alpha}{1:3} ')
+        #pat += d + Pattern('{vowel}') + d
         
-        for i in range(20):
-            print(next(pat.generate()))
+        #p_ = Pattern('{{{cons}{vowel}{{vowel}{cons}}}{@}}{2:3}')
+        p_ = Pattern('{{{digit}{2}}{{digit}{3}}}{@}')
+        print(next(p_.generate()))
+        #for i in range(20):
+        #    print(next(pat.generate()))
             #logger.info('Generated string: {0}'.format(p.generate().next()))
             #print('{0}'.format(next(p.generate())))
             #print('{0}'.format(next(p1.generate())))
@@ -421,6 +412,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
