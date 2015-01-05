@@ -144,6 +144,8 @@ class Pattern:
 
         if str.isalpha(self._curChar):
             self._parsePatternId(node)
+        elif self._curChar == '\'':
+            self._parseStringLiteral(node)
         elif str.isdigit(self._curChar) or self._curChar in self._quant:
             self._parseQuantifier(node)
             self._nodeStack[-2].quantifier = node
@@ -198,9 +200,31 @@ class Pattern:
         astNode.value = _filterRange(_parseRangeQuantifier()) if str.isdigit(self._curChar) else _parseGeneralQuantifier()
         logger.debug('parsed quantifier: {0}'.format(astNode.value))
 
-    def _parseStringLiteral(self):
-        """Not implemented yet"""
-        pass
+    def _parseStringLiteral(self, astNode):
+        """
+        Parse 'string literal' inside {pattern}.
+        String literals are only allowed inside curly-brace patterns.
+        """
+        logger.debug('Parsing string literal')
+        self._consumeChar(keep=False)
+        literal = ''
+        while True:
+            while self._curChar != '\'' and self._curChar != '\x00':
+                literal += self._curChar
+                self._consumeChar(keep=False)
+
+            if self._curChar == '\x00':
+                raise PGenParsingException('Missing closing `\'` in string literal')
+
+            if self._peek(lookahead=-1) != '\\':
+                self._consumeChar(keep=False)
+                astNode.typeid = AstNode.StringLiteral
+                astNode.value = literal
+                return
+
+            # Remove back-slash from string literal, append escaped `'`, and continue
+            literal = literal[:-1] + self._curChar
+            self._consumeChar(keep=False)
 
     def _parsePatternId(self, astNode=None):
         logger.debug('Parsing pattern id')
@@ -393,7 +417,8 @@ def main():
         #pat += d + Pattern('{vowel}') + d
         
         #p_ = Pattern('{{{cons}{vowel}{{vowel}{cons}}}{@}}{2:3}')
-        p_ = Pattern('{{{digit}{2}}{{digit}{3}}}{@}')
+        #p_ = Pattern('{{{digit}{2}}{{digit}{3}}}{@}')
+        p_ = Pattern("b{{'ae'}{'ee'}{'oo'}}{@}r")
         print(next(p_.generate()))
         #for i in range(20):
         #    print(next(pat.generate()))
