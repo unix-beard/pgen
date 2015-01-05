@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import logging
-import random
 import time
+import random
 import string
+import logging
+import argparse
 
 ###########################################################
 logger = logging.getLogger('pgen')
@@ -88,7 +89,6 @@ class Pattern:
         self.patternStr = patternStr
         self.patternId = patternId 
         self._pos = 0
-        self._curChar = self.patternStr[self._pos]
 
     def __add__(self, other):
         return Pattern(self.patternStr + other.patternStr)
@@ -100,6 +100,7 @@ class Pattern:
     def _parseString(self):
         """This method corresponds to the Expr production rule"""
         self.patternStr += '\x00' * 2
+        self._curChar = self.patternStr[self._pos]
 
         while self._curChar != '\x00':
             node = AstNode()
@@ -234,7 +235,6 @@ class Pattern:
             self._consumeChar(keep=False)
 
         logger.debug('Pattern ID: "{0}"'.format(patternId))
-        Pattern._plt.add(patternId)
         astNode.typeid = AstNode.PatternID
         astNode.value = patternId
 
@@ -275,9 +275,7 @@ class Pattern:
 
     def generate(self):
         """Traverse AST and generate the string"""
-        #logger.info('Parsing pattern "{0}"\n{1}'.format(self.patternStr, '#' * 80))
         self._parseString()
-        #printAST(self._root)
 
         # Should be empty by now!
         assert(self._nodeStack == [])
@@ -292,14 +290,20 @@ class Pattern:
     def _walkAST(self, astNode, input):
         s = input
         if not astNode.children:
-            if astNode.value == 'vowel':
+            if astNode.value == 'v':
                 s = self._applyQuantifier(astNode, random.choice, self._vowels)
-            elif astNode.value == 'cons':
+            elif astNode.value == 'V':
+                s = self._applyQuantifier(astNode, random.choice, self._vowels).upper()
+            elif astNode.value == 'c':
                 s = self._applyQuantifier(astNode, random.choice, self._cons)
-            elif astNode.value == 'digit':
+            elif astNode.value == 'C':
+                s = self._applyQuantifier(astNode, random.choice, self._cons).upper()
+            elif astNode.value == 'd':
                 s = self._applyQuantifier(astNode, random.choice, range(10))
             elif astNode.value == 'alpha':
                 s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
+            elif astNode.value == 'Alpha':
+                s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels).upper()
             else:
                 s = astNode.value
 
@@ -335,102 +339,15 @@ class Pattern:
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Pattern generator')
+    parser.add_argument('-c', '--count', dest='count', default=1, type=int)
+    parser.add_argument('-p', '--pattern', dest='pattern', type=str, required=True)
+    args = parser.parse_args()
+
     try:
-        #p = Pattern('{a}')
-        #p = Pattern('{{a}}')
-        #p = Pattern('{{{a}}}')
-        #p = Pattern('{a}{b}')
-        #p = Pattern('{{a}{b}}')
-        #p = Pattern('{{a}{b}{c}}')
-        #p = Pattern('{{a}{b}}{{c}{d}}')
-        #p = Pattern('{{a}{b}}{{c}{d}}{e}')
-        #p = Pattern('{{{a}{b}}{{c}{d}}}{e}')
-        #p = Pattern('a{cons}b')
-        #p = Pattern('ab{cons}{vowel}')
-        #p = Pattern('ab{{cons}{vowel}}')
-        #p = Pattern('ab{{{cons}{vowel}}{cons}}')
-        #p = Pattern('{{{a}{b}}{{c}{d}{e}{{f}{g}}{h}}}{i}')
-        #p = Pattern('0{{{vowel}{cons}}}1')
-        #p = Pattern('{{{{a}{+}}{*}}{?}}{1}')
-        #p = Pattern('{vowel}{cons}{digit}')
-        #p = Pattern('{}')
-        #p = Pattern('{}{}')
-        #p = Pattern('{{}{}}{}{}{}{{}{}{}{{}{}{{}}}}')
-
-        # Unbalanced
-        #p = Pattern('{')
-        #p = Pattern('{{}')
-        #p = Pattern('{{}}{')
-        #p = Pattern('{{{')
-        #p = Pattern('{{}{}}{}{}{{{}}')
-
-        # Quantifiers
-        #p = Pattern('{{a}{1}{b}{2}}{3}{c}{4}')
-        #p = Pattern('{cons}{vowel}{cons}{vowel}{cons}{vowel}{cons}')
-        #p = Pattern('{cons}{vowel}{cons}{cons}{vowel}{cons}{vowel}-{digit}{3}')
-        #p = Pattern('{{{{digit}{digit}}{1}{vowel}{1}}{2}}{3}')
-        #p = Pattern('{{digit}{1}{digit}{2}}{3}')
-        #p = Pattern('{{vowel}{3}{cons}{2}}')
-        #p = Pattern('{{a}{1}{b}{+}{c}{*}}{?}}')
-        #p = Pattern('{a}{*}{{{b}{+}}{*}}{?}')
-
-        # Range quantifiers
-        #p = Pattern('{digit}{1:}')
-        #p = Pattern('{digit}{1:2}')
-        #p = Pattern('{digit}{1:2:}')
-        #p = Pattern('{digit}{1:2:3}')
-        p = Pattern('{{vowel}{cons}{{vowel}{cons}}{1:3}}{1:3}')
-        p1 = Pattern('{{cons}{vowel}{{cons}{vowel}}{1:3}}{1:3}')
-        p2 = Pattern('{vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
-        p3 = Pattern('{vowel}{cons} {cons}{vowel}{cons} {vowel}{cons} {vowel}{cons}{vowel}{vowel}{cons}{vowel}{cons}')
-        p4 = Pattern('{vowel}{cons}{vowel}')
-        p5 = Pattern('{cons}{vowel}{cons}')
-        p6 = Pattern('{cons}{vowel}{2}')
-        p7 = Pattern('{vowel}{cons}{2}')
-        
-        # Unbound quantifiers
-        #p = Pattern('{2}{a}')
-        #p = Pattern('{?}{a}')
-
-        # Misc 
-
-        #p = Pattern('a{cons}_{digit}{2}')
-        #p = Pattern('a{cons}_{digit}{2:4}')
-        #p = Pattern('a{cons}_{vowel}{cons}-{digit}{2}')
-        #p = Pattern('a{cons}_{vowel}{cons}-{digit}{1:3}')
-        #p = Pattern('{{{vowel}{2}{cons}{2}}{2}}{2}')
-        #p = Pattern('{{vowel}{2}{cons}{2}}{2}')
-        #p = Pattern('{{vowel}{digit}{2}}{2}')
-        #p = Pattern('az{alpha}{1:3}{vowel}++')
-
-        # Meta pattern
-        #p = Pattern('\{vowel\}\{cons\}')
-
-        # Escaped characters
-        #p = Pattern('\{\{\t\}\}\\\\-\n')
-
-        #d = Pattern('б')
-        #pat = Pattern('{cons}')
-        #pat += Pattern('{vowel}')
-        #pat += Pattern('{digit} ')
-        #pat += Pattern('{alpha}{1:3} ')
-        #pat += d + Pattern('{vowel}') + d
-        
-        #p_ = Pattern('{{{cons}{vowel}{{vowel}{cons}}}{@}}{2:3}')
-        #p_ = Pattern('{{{digit}{2}}{{digit}{3}}}{@}')
-        p_ = Pattern("b{{'ae'}{'ee'}{'oo'}}{@}r")
-        print(next(p_.generate()))
-        #for i in range(20):
-        #    print(next(pat.generate()))
-            #logger.info('Generated string: {0}'.format(p.generate().next()))
-            #print('{0}'.format(next(p.generate())))
-            #print('{0}'.format(next(p1.generate())))
-            #print('{0}'.format(next(p2.generate())))
-            #print('{0}'.format(next(p3.generate())))
-            #print('{0}'.format(next(p4.generate())))
-            #print('{0}'.format(next(p5.generate())))
-            #print('{0}'.format(next(p6.generate())))
-            #print('{0}'.format(next(p7.generate())))
+        for i in range(args.count):
+            pattern = Pattern(args.pattern if args.pattern is not None else '{digit}{2:3}')
+            print(next(pattern.generate()))
     except PGenParsingException as ex:
         logger.error(ex)
 
