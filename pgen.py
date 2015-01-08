@@ -77,11 +77,11 @@ class Pattern:
     """
 
     def __init__(self, patternStr, patternId=''):
-        self._vowels = ['e','y','u','i','o','a']
-        self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
+        #self._vowels = ['e','y','u','i','o','a']
+        #self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
         
-        #self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
-        #self._cons = ['й','ц','к','н','г','ш','щ','з','х','ъ','ф','в','п','р','л','д','ж','ч','с','м','т','ь','б']
+        self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
+        self._cons = ['й','ц','к','н','г','ш','щ','з','х','ф','в','п','р','л','д','ж','ч','с','м','т','б']
         self._quant = ['?','+','*','@']
 
         self._root = AstNode(typeid=AstNode.Pattern)
@@ -206,13 +206,23 @@ class Pattern:
         Parse 'string literal' inside {pattern}.
         String literals are only allowed inside curly-brace patterns.
         """
+        ############################################################
+        # TODO: Handle escaped characters inside string literal
+        #       e.g., {'string literal: \n\tsome text'}
+        ############################################################
+
         logger.debug('Parsing string literal')
         self._consumeChar(keep=False)
         literal = ''
         while True:
             while self._curChar != '\'' and self._curChar != '\x00':
-                literal += self._curChar
-                self._consumeChar(keep=False)
+                if self._curChar == '\\':
+                    node = AstNode()
+                    self._parseEscapedChar(node)
+                    literal += node.value
+                else:
+                    literal += self._curChar
+                    self._consumeChar(keep=False)
 
             if self._curChar == '\x00':
                 raise PGenParsingException('Missing closing `\'` in string literal')
@@ -238,6 +248,20 @@ class Pattern:
         astNode.typeid = AstNode.PatternID
         astNode.value = patternId
 
+    def _parseEscapedChar(self, astNode=None):
+        nextChar = self._peek()
+        logger.debug(nextChar)
+        if nextChar not in ['n', 't', '\\', '\'', '{', '}']:
+            raise PGenParsingException('Unknown escape character "{0}{1}"'.format(self._curChar, nextChar))
+
+        if nextChar in ['n', 't']:
+            astNode.value = '\n' if nextChar == 'n' else '\t'
+        else: 
+            astNode.value = nextChar
+
+        self._consumeChar(keep=False)
+        self._consumeChar(keep=False)
+
     def _consumeChar(self, expect=None, keep=True, astNode=None):
         """If keep is False, then consume the character but don't store it inside astNode"""
 
@@ -255,20 +279,6 @@ class Pattern:
         self._curChar = self.patternStr[self._pos]
 
         logger.debug('Current character is "{0}"'.format(self._curChar))
-
-    def _parseEscapedChar(self, astNode=None):
-        nextChar = self._peek()
-        logger.debug(nextChar)
-        if nextChar not in ['n', 't', '\\', '{', '}']:
-            raise PGenParsingException('Unknown escape character "{0}{1}"'.format(self._curChar, nextChar))
-
-        if nextChar in ['n', 't']:
-            astNode.value = self._curChar + nextChar
-        else: 
-            astNode.value = nextChar
-
-        self._consumeChar(keep=False)
-        self._consumeChar(keep=False)
 
     def _peek(self, lookahead=1):
         return self.patternStr[self._pos + lookahead]
@@ -319,10 +329,16 @@ class Pattern:
         return s
 
     def _applyNonNumericQuantifier(self, astNode):
-        ################################################
+        ############################################################
         # TODO: Handle +,?,* quantifiers as well
+        # On the other hand, do I really need those quantifiers?
+        # I can easily emulate them with ranges: 
+        #   ? - {c}{0:1} 
+        #   + - {c}{1:n} 
+        #   * - {c}{*:n} 
+        #
         # For now this method handles only '@' (any of)
-        ################################################
+        ############################################################
 
         s = ''
         return self._walkAST(random.choice(astNode.children), s)
