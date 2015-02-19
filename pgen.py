@@ -77,11 +77,11 @@ class Pattern:
     """
 
     def __init__(self, patternStr, patternId=''):
-        #self._vowels = ['e','y','u','i','o','a']
-        #self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
+        self._vowels = ['e', 'y', 'u', 'i', 'o', 'a']
+        self._cons = [l for l in string.ascii_lowercase if l not in self._vowels]
         
-        self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
-        self._cons = ['й','ц','к','н','г','ш','щ','з','х','ф','в','п','р','л','д','ж','ч','с','м','т','б']
+        #self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
+        #self._cons = ['й','ц','к','н','г','ш','щ','з','х','ф','в','п','р','л','д','ж','ч','с','м','т','б']
         self._quant = ['?','+','*','@']
 
         self._root = AstNode(typeid=AstNode.Pattern)
@@ -311,6 +311,10 @@ class Pattern:
                     s = self._applyQuantifier(astNode, random.choice, self._cons).upper()
                 elif astNode.value == 'd':
                     s = self._applyQuantifier(astNode, random.choice, range(10))
+                elif astNode.value == 'x':
+                    s = self._applyQuantifier(astNode, random.choice, [d for d in range(10)] + ['a','b','c','d','e','f'])
+                elif astNode.value == 'X':
+                    s = self._applyQuantifier(astNode, random.choice, [d for d in range(10)] + ['A','B','C','D','E','F'])
                 elif astNode.value == 'alpha':
                     s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
                 elif astNode.value == 'Alpha':
@@ -335,10 +339,10 @@ class Pattern:
         ############################################################
         # TODO: Handle +,?,* quantifiers as well
         # On the other hand, do I really need those quantifiers?
-        # I can easily emulate them with ranges: 
-        #   ? - {c}{0:1} 
-        #   + - {c}{1:n} 
-        #   * - {c}{*:n} 
+        # I can easily emulate them with ranges:
+        #   ? - {c}{0:1}
+        #   + - {c}{1:n}
+        #   * - {c}{*:n}
         #
         # For now this method handles only '@' (any of)
         ############################################################
