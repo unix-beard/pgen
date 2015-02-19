@@ -300,22 +300,25 @@ class Pattern:
     def _walkAST(self, astNode, input):
         s = input
         if not astNode.children:
-            if astNode.value == 'v':
-                s = self._applyQuantifier(astNode, random.choice, self._vowels)
-            elif astNode.value == 'V':
-                s = self._applyQuantifier(astNode, random.choice, self._vowels).upper()
-            elif astNode.value == 'c':
-                s = self._applyQuantifier(astNode, random.choice, self._cons)
-            elif astNode.value == 'C':
-                s = self._applyQuantifier(astNode, random.choice, self._cons).upper()
-            elif astNode.value == 'd':
-                s = self._applyQuantifier(astNode, random.choice, range(10))
-            elif astNode.value == 'alpha':
-                s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
-            elif astNode.value == 'Alpha':
-                s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels).upper()
-            else:
-                s = astNode.value
+            if astNode.typeid == AstNode.PatternID:
+                if astNode.value == 'v':
+                    s = self._applyQuantifier(astNode, random.choice, self._vowels)
+                elif astNode.value == 'V':
+                    s = self._applyQuantifier(astNode, random.choice, self._vowels).upper()
+                elif astNode.value == 'c':
+                    s = self._applyQuantifier(astNode, random.choice, self._cons)
+                elif astNode.value == 'C':
+                    s = self._applyQuantifier(astNode, random.choice, self._cons).upper()
+                elif astNode.value == 'd':
+                    s = self._applyQuantifier(astNode, random.choice, range(10))
+                elif astNode.value == 'alpha':
+                    s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
+                elif astNode.value == 'Alpha':
+                    s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels).upper()
+                else:
+                    raise PGenParsingException('Unknown PatternID `{0}`'.format(astNode.value))
+            elif astNode.typeid == AstNode.StringLiteral:
+                    s = astNode.value
 
             return s
 
