@@ -4,14 +4,14 @@ pgen
 Pattern Generator
 
 ######Short description######
-Sometimes I need to generate sample data that follows a particular pattern (e.g., numbers consisting of these many digits (bin, dec, hex) or sequence of characters that look like a word, or a sequence of words that look like a sentence)
+Sometimes I need to generate sample data that follows a particular pattern (e.g., numbers consisting of these many digits (bin, dec, hex) or sequence of characters that look like a word, or a sequence of words that look like a sentence, or csv data)
 
 For example, this pattern will generate a decimal number of 6 digits
 
     $ pgen.py -p "{d}{6}"
     687035
 
-And this pattern will generate a string that looks like md5 hash
+And this pattern will generate a string that looks like an md5 hash
 
     $ pgen.py -p "{x}{32}"
     2a313087a6ee8a0aee00806fb4b9f0b8
