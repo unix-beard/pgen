@@ -122,6 +122,7 @@ class Pattern:
             self._root.addChild(node)
 
         logger.debug('Saw NULL character. Parsing is done!')
+        #printAST(self._root)
 
     def _parsePatternExpr(self, astNode):
         """This method corresponds to the Term production rule"""
@@ -321,7 +322,7 @@ class Pattern:
                     s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels).upper()
                 else:
                     raise PGenParsingException('Unknown PatternID `{0}`'.format(astNode.value))
-            elif astNode.typeid == AstNode.StringLiteral:
+            elif astNode.typeid == AstNode.StringLiteral or astNode.typeid == AstNode.Char:
                     s = astNode.value
 
             return s
