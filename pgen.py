@@ -83,6 +83,7 @@ class Pattern:
         #self._vowels = ['у','е','ё','ы','э','а','о','я','и','ю']
         #self._cons = ['й','ц','к','н','г','ш','щ','з','х','ф','в','п','р','л','д','ж','ч','с','м','т','б']
         self._quant = ['?','+','*','@']
+        self._special_chars = [s for s in " !\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"]
 
         self._root = AstNode(typeid=AstNode.Pattern)
         self._nodeStack = []
@@ -316,6 +317,8 @@ class Pattern:
                     s = self._applyQuantifier(astNode, random.choice, [d for d in range(10)] + ['a','b','c','d','e','f'])
                 elif astNode.value == 'X':
                     s = self._applyQuantifier(astNode, random.choice, [d for d in range(10)] + ['A','B','C','D','E','F'])
+                elif astNode.value == 's':
+                    s = self._applyQuantifier(astNode, random.choice, self._special_chars)
                 elif astNode.value == 'alpha':
                     s = self._applyQuantifier(astNode, random.choice, self._cons + self._vowels)
                 elif astNode.value == 'Alpha':
