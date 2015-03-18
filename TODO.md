@@ -34,5 +34,17 @@ double {alpha}{2} # Pass pattern literal as a parameter (same as {alpha}{alpha}{
 ```
 
 ```python
-let mult p quant = {p}{quant}
+let mult p quant = p ~ quant
 mult {d} {5}
+mult {{'John'}{'Nick'}} {@}
+```
+
+```python
+let node name value repeat =
+    # con is a built-in function that concatenates its arguments
+    # Semantically it's equivalent to p1 ~ p2 ~ ... ~ pN
+    match name with
+    | "" -> ""
+    | _ -> con "<" name ">" value "</" name ">" repeat
+    
+node "root" (node "a" (node "b" "value of b" 3) 2) 1
