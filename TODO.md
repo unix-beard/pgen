@@ -21,14 +21,14 @@ Extend the pattern syntax to support the following features and types:
 **PDL** (**P**attern **D**efinition **L**anguage)
 
 ```python
-let p = {d}
-p
+let p = {d}{2}
+print p
 ```
 
 ```python
 # Pattern that takes another pattern as an argument
 let p = {d}
-let double p = {p}{2}
+let double p = p ~ {2}
 double p    # Same as {d}{d}
 double {alpha}{2} # Pass pattern literal as a parameter (same as {alpha}{alpha}{alpha}{alpha})
 ```
