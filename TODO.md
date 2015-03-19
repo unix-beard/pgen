@@ -16,6 +16,11 @@ Extend the pattern syntax to support the following features and types:
   So, the ip address pattern could be genarated like this:
   
   ```192.168.{i=0:254}.{i=1:255}``` - IP address range
+
+
+**Probability operator**
+
+  ```{alpha}{d}%50{s}%10``` - Here the probabilty of ```{d}``` to appear is 50% and ```{s}``` is 10%, respectively.
   
 
 **PDL** (**P**attern **D**efinition **L**anguage)
@@ -26,11 +31,11 @@ print p
 ```
 
 ```ocaml
-# Pattern that takes another pattern as an argument
+(* Pattern that takes another pattern as an argument *)
 let p = {d}
 let double p = p ~ {2}
 double p    # Same as {d}{d}
-double {alpha}{2} # Pass pattern literal as a parameter (same as {alpha}{alpha}{alpha}{alpha})
+double {alpha}{2}  (* Pass pattern literal as a parameter (same as {alpha}{alpha}{alpha}{alpha}) *)
 ```
 
 ```ocaml
@@ -41,8 +46,8 @@ mult {{'John'}{'Nick'}} {@}
 
 ```ocaml
 let node name value repeat =
-    # con is a built-in function that concatenates its arguments
-    # Semantically it's equivalent to p1 ~ p2 ~ ... ~ pN
+    (* con is a built-in function that concatenates its arguments
+     Semantically it's equivalent to p1 ~ p2 ~ ... ~ pN *)
     match name with
     | "" -> ""
     | _ -> con "<" name ">" value "</" name ">" repeat
