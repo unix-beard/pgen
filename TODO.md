@@ -20,12 +20,12 @@ Extend the pattern syntax to support the following features and types:
 
 **PDL** (**P**attern **D**efinition **L**anguage)
 
-```python
+```ocaml
 let p = {d}{2}
 print p
 ```
 
-```python
+```ocaml
 # Pattern that takes another pattern as an argument
 let p = {d}
 let double p = p ~ {2}
@@ -33,13 +33,13 @@ double p    # Same as {d}{d}
 double {alpha}{2} # Pass pattern literal as a parameter (same as {alpha}{alpha}{alpha}{alpha})
 ```
 
-```python
+```ocaml
 let mult p quant = p ~ quant
 mult {d} {5}
 mult {{'John'}{'Nick'}} {@}
 ```
 
-```python
+```ocaml
 let node name value repeat =
     # con is a built-in function that concatenates its arguments
     # Semantically it's equivalent to p1 ~ p2 ~ ... ~ pN
@@ -48,3 +48,12 @@ let node name value repeat =
     | _ -> con "<" name ">" value "</" name ">" repeat
     
 node "root" (node "a" (node "b" "value of b" 3) 2) 1
+```
+
+```ocaml
+let file_with_ext =
+    let ext = {{"txt"}{"ini"}{"xml"}{"json"}{"md"}}{@} in
+    let name = {alpha}{4:8} in
+    name ~ '.' ~ ext
+print file_with_ext    
+```
