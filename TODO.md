@@ -1,4 +1,20 @@
-Extend the pattern syntax to support the following features and types:
+#### Extend pattern syntax to support the following features and types:
+
+##### New types
+
+_**Integer**_
+
+*Rationale*
+
+Sometimes there is a need to generate numbers that are equal to or less/greater than some other number.
+For example, if we need to generate a time-stamp pattern, we could easily write:
+
+  ```{i<=24}{{':'}{i<=59}}{2}``` and get output like this: ```19:28:41``` or ```7:30:58```
+
+
+
+  ```{i1}, {i2}, {i4}, {i8}, {i16}, {i32}, {i64}, {i}```
+
 
 **Comparison (>, <, <=, >=, =, <>) operators on integers (integer is going to be a new type)**
 
