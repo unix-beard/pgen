@@ -53,7 +53,7 @@ Sometimes I need a piece of hex-looking text. Like this:
     
 And with this simple pattern we can achieve just that:
 
-    pgen.py -c 8 -p "{{x}{2}{' '}}{16}"
+    $ pgen.py -c 8 -p "{{x}{2}{' '}}{16}"
     
 But I also need from time time a HEX-looking text (whith capital letters 'A' - 'F'):
 
@@ -68,4 +68,12 @@ But I also need from time time a HEX-looking text (whith capital letters 'A' - '
     
 To achieve that, let's use ```{X}``` built-in pattern:
 
-    pgen.py -c 8 -p "{{X}{2}{' '}}{16}"
+    $ pgen.py -c 8 -p "{{X}{2}{' '}}{16}"
+
+To play with arithmetic expressions, you can use this pattern:
+
+    $ pgen.py -c 4 -p "{d}{1:2}{{{' + '}{' - '}{' * '}{' / '}}{@}{d}{1:2}}{2:4}"
+    66 - 5 * 59
+    8 - 8 - 5
+    35 / 9 - 18 / 8
+    3 / 60 / 3
