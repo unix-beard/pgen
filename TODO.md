@@ -1,4 +1,25 @@
-#### Extend pattern syntax to support the following features and types:
+#### Extend pattern syntax to support the following features, types and operators:
+
+**Inclusion/exclusion operator**
+
+*Rationale*
+
+Currently there is no syntax to support generation of values from a subset. E.g., how to specify that you need a digit between 1 and 9 but not 0? Or a digit that might be 1,3,5,7,9 but not 0,2,4,6,8? The following syntax extension is going to solve this problem with two operators: ```|``` - inclusion and ```/``` - exclusion
+
+*Examples*:
+
+```{d|13579}``` - Generate a digit which is either 1, 3, 5, 7, or 9
+
+```{d/0}``` - Generate a digit which is not 0
+
+```{d/13579}``` - Generate only even digits
+
+```{x|abcdef}``` - Generate any hex digit between ```a``` and ```f```
+
+```{s|<=>}``` - Generate either ```<```, ```=```, or ```>``` special character
+
+```{s/!?}``` - Generate all special characters except ```!``` and ```?```
+
 
 ##### New types
 
