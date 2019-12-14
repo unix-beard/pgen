@@ -3,7 +3,7 @@ pgen
 
 Pattern Generator
 
-######Short description######
+##Short description
 Sometimes I need to generate sample data that follows a particular pattern (e.g., numbers consisting of these many digits (bin, dec, hex) or sequence of characters that look like a word, or a sequence of words that look like a sentence, or csv data)
 
 For example, this pattern will generate a decimal number of 6 digits
